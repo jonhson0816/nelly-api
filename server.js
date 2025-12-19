@@ -27,13 +27,14 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
+      'https://nelly.pics',
       'http://localhost:3000',
       'http://localhost:5173',
       'http://localhost:5174',
       process.env.FRONTEND_URL
     ].filter(Boolean),
     credentials: true,
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
   }
 });
 
@@ -53,16 +54,29 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Enable CORS - FIXED TO SUPPORT VITE (PORT 5173)
+// Enable CORS - FIXED TO SUPPORT VITE (PORT 5173) AND VERCEL
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',  // Create React App
-    'http://localhost:5173',  // Vite
-    'http://localhost:5174',  // Vite (alternative)
-    process.env.FRONTEND_URL
-  ].filter(Boolean),
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://nelly.pics',
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('❌ Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 };
 app.use(cors(corsOptions));
 
@@ -120,12 +134,8 @@ const messagingLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // ✅ FIX: Use skipFailedRequests to ignore the IPv6 warning
   skipFailedRequests: false,
-  // ✅ FIX: Simplified key generator (user ID or IP)
   keyGenerator: (req) => {
-    // If user is authenticated, use their ID
-    // Otherwise fall back to IP (express-rate-limit handles IPv6 automatically)
     return req.user?.id || req.ip;
   }
 });
@@ -139,13 +149,11 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/contact/submit', contactLimiter);
 app.use('/api/messages', messagingLimiter);
 
+
 // ✅ SOCKET.IO CONFIGURATION - COMPLETE FIX FOR AUDIO CALLS
-
-// ✅ SOCKET.IO CONFIGURATION - COMPLETE FIX (NO DUPLICATES)
-
-const onlineUsers = new Map(); // userId -> socketId
-const activeCalls = new Map(); // callId -> call data
-const callTimeouts = new Map(); // callId -> timeout reference
+const onlineUsers = new Map();
+const activeCalls = new Map();
+const callTimeouts = new Map();
 
 io.on('connection', (socket) => {
   console.log('🔌 User connected:', socket.id);
@@ -175,117 +183,117 @@ io.on('connection', (socket) => {
   // ============================================
 
   // ✅ Initiate audio call - SENDS CALLID BACK TO CALLER
-socket.on('audio:call:initiate', async ({ receiverId, callerId, callerInfo }) => {
-  try {
-    console.log(`📞 ${callerId} is calling ${receiverId}`);
+  socket.on('audio:call:initiate', async ({ receiverId, callerId, callerInfo }) => {
+    try {
+      console.log(`📞 ${callerId} is calling ${receiverId}`);
 
-    const callId = `call_${callerId}_${receiverId}_${Date.now()}`;
-    const receiverSocketId = onlineUsers.get(receiverId);
-    
-    if (!receiverSocketId) {
-      console.log('❌ Receiver is offline');
-      socket.emit('audio:call:error', { message: 'User is offline' });
-      return;
-    }
-    
-    // Create call session
-    activeCalls.set(callId, {
-      id: callId,
-      caller: callerId,
-      receiver: receiverId,
-      callerSocketId: socket.id,
-      receiverSocketId: receiverSocketId,
-      status: 'ringing',
-      startedAt: new Date(),
-      callerInfo: callerInfo
-    });
-
-    // ✅ Set 30-second timeout for missed call
-    const missedCallTimeout = setTimeout(async () => {
-      const call = activeCalls.get(callId);
+      const callId = `call_${callerId}_${receiverId}_${Date.now()}`;
+      const receiverSocketId = onlineUsers.get(receiverId);
       
-      if (call && call.status === 'ringing') {
-        console.log(`⏰ Call ${callId} timed out - creating missed call records`);
-        
-        // ✅ CREATE DATABASE RECORDS FOR BOTH USERS
-        const Message = require('./models/Message');
-        
-        try {
-          // Create missed call record for CALLER (shows as "No answer")
-          await Message.create({
-            sender: call.caller,
-            receiver: call.receiver,
-            type: 'call',
-            content: '',
-            callData: {
-              duration: 0,
-              callType: 'audio',
-              status: 'missed',
-              timestamp: new Date(),
-            },
-            status: 'delivered',
-          });
-          
-          // Create missed call record for RECEIVER (shows as "Missed call")
-          await Message.create({
-            sender: call.receiver,
-            receiver: call.caller,
-            type: 'call',
-            content: '',
-            callData: {
-              duration: 0,
-              callType: 'audio',
-              status: 'missed',
-              timestamp: new Date(),
-            },
-            status: 'delivered',
-          });
-          
-          console.log('✅ Missed call records created in database');
-        } catch (error) {
-          console.error('❌ Error creating missed call records:', error);
-        }
-        
-        // Notify CALLER: "no answer"
-        io.to(call.callerSocketId).emit('audio:call:missed', {
-          callId,
-          reason: 'No answer',
-          callType: 'outgoing'
-        });
-        
-        // Notify RECEIVER: "missed call"
-        io.to(call.receiverSocketId).emit('audio:call:missed', {
-          callId,
-          reason: 'Missed call',
-          callType: 'incoming'
-        });
-        
-        activeCalls.delete(callId);
-        callTimeouts.delete(callId);
+      if (!receiverSocketId) {
+        console.log('❌ Receiver is offline');
+        socket.emit('audio:call:error', { message: 'User is offline' });
+        return;
       }
-    }, 30000);
-    
-    callTimeouts.set(callId, missedCallTimeout);
+      
+      // Create call session
+      activeCalls.set(callId, {
+        id: callId,
+        caller: callerId,
+        receiver: receiverId,
+        callerSocketId: socket.id,
+        receiverSocketId: receiverSocketId,
+        status: 'ringing',
+        startedAt: new Date(),
+        callerInfo: callerInfo
+      });
 
-    // ✅ CRITICAL FIX: Send callId BACK to caller so they have the correct one
-    socket.emit('audio:call:initiated', {
-      callId,
-      receiverId,
-    });
+      // ✅ Set 30-second timeout for missed call
+      const missedCallTimeout = setTimeout(async () => {
+        const call = activeCalls.get(callId);
+        
+        if (call && call.status === 'ringing') {
+          console.log(`⏰ Call ${callId} timed out - creating missed call records`);
+          
+          // ✅ CREATE DATABASE RECORDS FOR BOTH USERS
+          const Message = require('./models/Message');
+          
+          try {
+            // Create missed call record for CALLER (shows as "No answer")
+            await Message.create({
+              sender: call.caller,
+              receiver: call.receiver,
+              type: 'call',
+              content: '',
+              callData: {
+                duration: 0,
+                callType: 'audio',
+                status: 'missed',
+                timestamp: new Date(),
+              },
+              status: 'delivered',
+            });
+            
+            // Create missed call record for RECEIVER (shows as "Missed call")
+            await Message.create({
+              sender: call.receiver,
+              receiver: call.caller,
+              type: 'call',
+              content: '',
+              callData: {
+                duration: 0,
+                callType: 'audio',
+                status: 'missed',
+                timestamp: new Date(),
+              },
+              status: 'delivered',
+            });
+            
+            console.log('✅ Missed call records created in database');
+          } catch (error) {
+            console.error('❌ Error creating missed call records:', error);
+          }
+          
+          // Notify CALLER: "no answer"
+          io.to(call.callerSocketId).emit('audio:call:missed', {
+            callId,
+            reason: 'No answer',
+            callType: 'outgoing'
+          });
+          
+          // Notify RECEIVER: "missed call"
+          io.to(call.receiverSocketId).emit('audio:call:missed', {
+            callId,
+            reason: 'Missed call',
+            callType: 'incoming'
+          });
+          
+          activeCalls.delete(callId);
+          callTimeouts.delete(callId);
+        }
+      }, 30000);
+      
+      callTimeouts.set(callId, missedCallTimeout);
 
-    // ✅ Notify receiver about incoming call
-    io.to(receiverSocketId).emit('audio:call:incoming', {
-      callId,
-      caller: callerInfo,
-    });
+      // ✅ CRITICAL FIX: Send callId BACK to caller so they have the correct one
+      socket.emit('audio:call:initiated', {
+        callId,
+        receiverId,
+      });
 
-    console.log(`✅ Call initiated: ${callId} (sent to both caller and receiver)`);
+      // ✅ Notify receiver about incoming call
+      io.to(receiverSocketId).emit('audio:call:incoming', {
+        callId,
+        caller: callerInfo,
+      });
 
-  } catch (error) {
-    console.error('❌ Error initiating call:', error);
-    socket.emit('audio:call:error', { message: 'Failed to initiate call' });
-  }
-});
+      console.log(`✅ Call initiated: ${callId} (sent to both caller and receiver)`);
+
+    } catch (error) {
+      console.error('❌ Error initiating call:', error);
+      socket.emit('audio:call:error', { message: 'Failed to initiate call' });
+    }
+  });
 
   // ✅ Accept audio call
   socket.on('audio:call:accept', async ({ callId }) => {
@@ -731,7 +739,7 @@ server.listen(PORT, () => {
 ║   Database: Connected ✅                              ║
 ║   Socket.IO: Active ✅                                ║
 ║   Security: Enabled ✅                                ║
-║   CORS: Enabled (Vite + CRA) ✅                       ║
+║   CORS: Enabled (Vite + Vercel) ✅                    ║
 ║   Rate Limiting: Active ✅                            ║
 ║   Stories Auto-Cleanup: Active ✅                     ║
 ║   Profile System: Active ✅                           ║

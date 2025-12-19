@@ -24,7 +24,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-console.log('✅ Cloudinary configured:', process.env.CLOUDINARY_CLOUD_NAME);
+console.log('Cloudinary configured:', process.env.CLOUDINARY_CLOUD_NAME);
 
 // ============================================
 // STORAGE FOR IMAGES (Posts, Avatars, Cover Photos)
@@ -92,9 +92,9 @@ const audioStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'nelly-korda/audio',
-    resource_type: 'video', // Cloudinary uses 'video' for audio files
+    resource_type: 'video',
     allowed_formats: ['webm', 'wav', 'mp3', 'mpeg', 'ogg', 'mp4', 'm4a'],
-    format: 'mp3', // Force MP3 output
+    format: 'mp3',
     transformation: [
       {
         audio_codec: 'mp3',
@@ -102,7 +102,7 @@ const audioStorage = new CloudinaryStorage({
         bit_rate: '128k'
       }
     ],
-    // ✅ CRITICAL: Ensure clean MP3 URL
+    //Ensure clean MP3 URL
     public_id: (req, file) => `voice_${Date.now()}`
   },
 });
@@ -114,7 +114,7 @@ const audioStorage = new CloudinaryStorage({
 const uploadImage = multer({
   storage: imageStorage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max
+    fileSize: 10 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -128,7 +128,7 @@ const uploadImage = multer({
 const uploadVideo = multer({
   storage: storyStorage,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB max
+    fileSize: 100 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/', 'video/'];
@@ -175,19 +175,19 @@ const uploadMediaWithAudio = multer({
       });
       
       if (isAudio) {
-        // ✅ CRITICAL FIX: Proper audio configuration for web playback
+        //Proper audio configuration for web playback
         return {
           folder: 'nelly-korda/audio',
-          resource_type: 'video', // Cloudinary uses 'video' for audio
+          resource_type: 'video',
           allowed_formats: ['webm', 'ogg', 'mp3', 'wav', 'mpeg', 'mp4', 'm4a'],
-          format: 'mp3', // ✅ Force MP3 output
-          flags: 'attachment', // ✅ Prevent download, allow streaming
+          format: 'mp3',
+          flags: 'attachment',
           transformation: [
             {
               audio_codec: 'mp3',
               audio_frequency: 44100,
               bit_rate: '128k',
-              fetch_format: 'mp3' // ✅ Ensure MP3 format
+              fetch_format: 'mp3'
             }
           ]
         };
@@ -216,7 +216,7 @@ const uploadMediaWithAudio = multer({
     },
   }),
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB max
+    fileSize: 100 * 1024 * 1024,
     files: 10,
   },
   fileFilter: (req, file, cb) => {
@@ -226,7 +226,7 @@ const uploadMediaWithAudio = multer({
       mimetype: file.mimetype
     });
     
-    // ✅ FIXED: Allow images, audio, AND video files
+    // Allow images, audio, AND video files
     const allowedMimeTypes = [
       // Images
       'image/jpeg',
@@ -260,7 +260,7 @@ const uploadMediaWithAudio = multer({
     );
     
     if (isAllowed) {
-      console.log('✅ File type allowed:', file.mimetype);
+      console.log('File type allowed:', file.mimetype);
       cb(null, true);
     } else {
       console.error('❌ File type rejected:', file.mimetype);
@@ -279,14 +279,14 @@ const deleteFile = async (publicId) => {
     // Determine resource type from public ID or path
     let resourceType = 'image';
     if (publicId.includes('video') || publicId.includes('audio')) {
-      resourceType = 'video'; // Cloudinary uses 'video' for both video and audio
+      resourceType = 'video';
     }
     
     const result = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType,
     });
     
-    console.log('✅ Deleted from Cloudinary:', publicId);
+    console.log('Deleted from Cloudinary:', publicId);
     return result;
   } catch (error) {
     console.error('❌ Cloudinary Delete Error:', error.message);
@@ -334,7 +334,7 @@ const postMediaStorage = new CloudinaryStorage({
 const uploadMedia = multer({
   storage: postMediaStorage,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB max
+    fileSize: 100 * 1024 * 1024,
     files: 10,
   },
   fileFilter: (req, file, cb) => {

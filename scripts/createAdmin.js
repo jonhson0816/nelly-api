@@ -1,9 +1,3 @@
-// ============================================
-// CREATE ADMIN USER SCRIPT - FIXED VERSION
-// ============================================
-// Save this as: scripts/createAdmin.js
-// Run with: node scripts/createAdmin.js
-
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const path = require('path');
@@ -27,7 +21,7 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-console.log('✅ MongoDB URI found');
+console.log('MongoDB URI found');
 console.log('');
 
 // User Schema (simplified - matches your User model)
@@ -65,7 +59,7 @@ async function createAdminUser() {
     console.log('🔌 Connecting to MongoDB...');
     await mongoose.connect(MONGO_URI);
     
-    console.log('✅ Connected to MongoDB');
+    console.log('Connected to MongoDB');
     console.log('📊 Database:', mongoose.connection.name);
     console.log('');
 
@@ -121,7 +115,7 @@ async function createAdminUser() {
 
     console.log('');
     console.log('🎉 ═══════════════════════════════════════════════════════');
-    console.log('✅ Admin user created successfully!');
+    console.log('Admin user created successfully!');
     console.log('═══════════════════════════════════════════════════════');
     console.log('');
     console.log('📋 ADMIN LOGIN CREDENTIALS:');
