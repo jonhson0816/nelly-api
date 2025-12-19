@@ -2,7 +2,6 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const cron = require('node-cron');
@@ -80,77 +79,20 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// ✅ RELAXED Rate Limiting for Development
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
-  message: {
-    success: false,
-    message: 'Too many requests, please try again later.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // ✅ Don't apply to frequently-polled endpoints
-  skip: (req) => {
-    return req.path.includes('/messages/conversations') || 
-           req.path.includes('/messages/conversation/') ||
-           req.path.includes('/notifications') ||
-           req.path.includes('/auth/me');
-  }
-});
+// ✅ RATE LIMITING COMPLETELY REMOVED - NO RESTRICTIONS
 
-// ✅ AUTHENTICATION Rate Limiting (Strict)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Only 5 login attempts per 15 minutes
-  message: {
-    success: false,
-    message: 'Too many login attempts, please try again after 15 minutes.',
-  },
-  skipSuccessfulRequests: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// ✅ CONTACT FORM Rate Limiting (Prevent Spam)
-const contactLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // Only 3 contact submissions per 15 minutes
-  message: {
-    success: false,
-    message: 'Too many contact requests. Please try again after 15 minutes.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// ✅ MESSAGING Rate Limiting (Per User ID, NOT IP)
-const messagingLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute window
-  max: 30, // 30 requests per minute per user
-  message: {
-    success: false,
-    message: 'Too many message requests. Please slow down.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipFailedRequests: false,
-  keyGenerator: (req) => {
-    return req.user?.id || req.ip;
-  }
+// ============================================
+// REQUEST LOGGING (Optional - for monitoring)
+// ============================================
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`${timestamp} - ${req.method} ${req.path} - IP: ${req.ip}`);
+  next();
 });
 
 // ============================================
-// APPLY RATE LIMITING MIDDLEWARE
+// SOCKET.IO CONFIGURATION - COMPLETE FIX FOR AUDIO CALLS
 // ============================================
-app.use('/api/', apiLimiter);
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api/contact/submit', contactLimiter);
-app.use('/api/messages', messagingLimiter);
-
-
-// ✅ SOCKET.IO CONFIGURATION - COMPLETE FIX FOR AUDIO CALLS
 const onlineUsers = new Map();
 const activeCalls = new Map();
 const callTimeouts = new Map();
@@ -628,7 +570,7 @@ app.get('/', (req, res) => {
       '✅ Real-time Notifications',
       '✅ Admin Dashboard Analytics',
       '✅ Privacy Controls',
-      '✅ Rate Limiting & Security',
+      '✅ NO RATE LIMITING - Unlimited Requests',
     ],
     documentation: 'https://docs.nellykorda.com',
   });
@@ -649,6 +591,7 @@ app.get('/api/health', (req, res) => {
     socketIO: 'Active',
     activeCalls: activeCalls.size,
     onlineUsers: onlineUsers.size,
+    rateLimiting: 'DISABLED',
   });
 });
 
@@ -740,12 +683,14 @@ server.listen(PORT, () => {
 ║   Socket.IO: Active ✅                                ║
 ║   Security: Enabled ✅                                ║
 ║   CORS: Enabled (Vite + Vercel) ✅                    ║
-║   Rate Limiting: Active ✅                            ║
+║   Rate Limiting: DISABLED ✅                          ║
 ║   Stories Auto-Cleanup: Active ✅                     ║
 ║   Profile System: Active ✅                           ║
 ║   Audio Calls: Active ✅                              ║
 ║   Contact to Messenger: Active ✅                     ║
 ║   Cron Jobs: Active ✅                                ║
+║                                                       ║
+║   🔥 UNLIMITED REQUESTS - NO RESTRICTIONS 🔥         ║
 ║                                                       ║
 ║   API Documentation: http://localhost:${PORT}            ║
 ║   Health Check: http://localhost:${PORT}/api/health      ║
