@@ -57,7 +57,7 @@ app.use(helmet({
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
-      'https://nelly-korda-ochre.vercel.app/',
+      'https://nelly-korda-ochre.vercel.app',
       'http://localhost:3000',
       'http://localhost:5173',
       'http://localhost:5174',
