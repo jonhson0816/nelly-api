@@ -26,7 +26,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      'https://nelly-korda-ochre.vercel.app/',
+      'https://nelly-korda-ochre.vercel.app',
       'http://localhost:3000',
       'http://localhost:5173',
       'http://localhost:5174',
